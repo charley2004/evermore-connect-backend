@@ -1,0 +1,193 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reviews Admin — Evermore Connect</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,system-ui,sans-serif;background:#04100A;color:#F0F7EF;min-height:100vh}
+  .login{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;padding:20px}
+  .login h1{font-size:20px;font-weight:700;color:#C9A84C}
+  .login input{width:280px;background:#0C1E10;border:1px solid rgba(201,168,76,.2);color:#F0F7EF;border-radius:8px;padding:11px 14px;font-size:14px;outline:none}
+  .login input:focus{border-color:#C9A84C}
+  .btn-gold{background:linear-gradient(135deg,#C9A84C,#b8952e);color:#000;border:none;padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;width:280px}
+  .err{color:#FF6B6B;font-size:13px}
+  /* Dashboard */
+  .dash{display:none;padding:32px 24px;max-width:900px;margin:0 auto}
+  .dash.show{display:block}
+  .dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+  .dash-header h1{font-size:18px;font-weight:700;color:#C9A84C}
+  .site-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .tab{background:#0C1E10;border:1px solid rgba(201,168,76,.15);color:#A8C4A0;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+  .tab.active{background:rgba(201,168,76,.12);border-color:rgba(201,168,76,.4);color:#C9A84C}
+  .count-badge{background:rgba(201,168,76,.15);color:#C9A84C;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;margin-left:6px}
+  .empty{color:#A8C4A0;font-size:13px;padding:16px 0}
+  .rcard{background:#0C1E10;border:1px solid rgba(201,168,76,.12);border-radius:12px;padding:18px;margin-bottom:14px}
+  .rcard-meta{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  .stars{color:#f5a623;font-size:14px}
+  .rname{font-size:13px;font-weight:700;color:#F0F7EF}
+  .rloc{font-size:11px;color:#A8C4A0}
+  .rsite{font-size:10px;background:rgba(201,168,76,.1);color:#C9A84C;padding:2px 8px;border-radius:99px;font-weight:700}
+  .rdate{font-size:11px;color:#6A8A62;margin-left:auto}
+  .rbody{font-size:13px;color:#A8C4A0;line-height:1.65;margin-bottom:12px;font-style:italic}
+  .ractions{display:flex;gap:8px}
+  .btn-approve{background:#5FAF7B;color:#000;border:none;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn-reject{background:transparent;border:1px solid rgba(255,107,107,.4);color:#FF6B6B;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn-approve:hover{opacity:.85}
+  .btn-reject:hover{background:rgba(255,107,107,.08)}
+  .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#A8C4A0;margin-bottom:8px}
+  .loading{color:#A8C4A0;font-size:13px;padding:20px 0}
+</style>
+</head>
+<body>
+
+<!-- Login gate -->
+<div class="login" id="loginScreen">
+  <h1>Reviews Admin</h1>
+  <input type="password" id="keyInput" placeholder="Enter admin key" autocomplete="off">
+  <button class="btn-gold" onclick="login()">Unlock</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<!-- Dashboard -->
+<div class="dash" id="dashboard">
+  <div class="dash-header">
+    <h1>Review Moderation</h1>
+    <button class="btn-gold" style="width:auto;padding:8px 18px;font-size:12px" onclick="loadAll()">↻ Refresh</button>
+  </div>
+
+  <div class="site-tabs" id="siteTabs"></div>
+
+  <div id="pendingSection">
+    <div class="section-label">Pending Approval</div>
+    <div id="pendingList"><p class="loading">Loading…</p></div>
+  </div>
+</div>
+
+<script>
+var adminKey = '';
+var allPending = [];
+var currentSite = 'all';
+
+function login() {
+  var k = document.getElementById('keyInput').value.trim();
+  if (!k) return;
+  adminKey = k;
+
+  fetch('/api/reviews/pending?adminKey=' + encodeURIComponent(k))
+    .then(function(r) {
+      if (r.status === 403) throw new Error('Wrong admin key');
+      return r.json();
+    })
+    .then(function(d) {
+      allPending = d.reviews || [];
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboard').classList.add('show');
+      buildTabs();
+      renderList();
+    })
+    .catch(function(e) {
+      document.getElementById('loginErr').textContent = e.message;
+    });
+}
+
+function buildTabs() {
+  var sites = ['all'];
+  allPending.forEach(function(r) {
+    if (!sites.includes(r.site)) sites.push(r.site);
+  });
+
+  var tabs = document.getElementById('siteTabs');
+  tabs.innerHTML = sites.map(function(s) {
+    var count = s === 'all' ? allPending.length : allPending.filter(function(r){ return r.site === s; }).length;
+    return '<button class="tab' + (s === currentSite ? ' active' : '') + '" onclick="setTab(\'' + s + '\')">' +
+      (s === 'all' ? 'All Sites' : s) +
+      '<span class="count-badge">' + count + '</span>' +
+    '</button>';
+  }).join('');
+}
+
+function setTab(s) {
+  currentSite = s;
+  buildTabs();
+  renderList();
+}
+
+function starsHtml(n) {
+  return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
+function renderList() {
+  var list = currentSite === 'all'
+    ? allPending
+    : allPending.filter(function(r){ return r.site === currentSite; });
+
+  var el = document.getElementById('pendingList');
+
+  if (!list.length) {
+    el.innerHTML = '<p class="empty">No pending reviews' + (currentSite !== 'all' ? ' for ' + currentSite : '') + '.</p>';
+    return;
+  }
+
+  el.innerHTML = list.map(function(r) {
+    var d = new Date(r.createdAt).toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' });
+    return '<div class="rcard" id="rc-' + r.id + '">' +
+      '<div class="rcard-meta">' +
+        '<span class="stars">' + starsHtml(r.rating) + '</span>' +
+        '<span class="rname">' + esc(r.name) + '</span>' +
+        '<span class="rloc">' + esc(r.location) + '</span>' +
+        '<span class="rsite">' + esc(r.site) + '</span>' +
+        '<span class="rdate">' + d + '</span>' +
+      '</div>' +
+      '<p class="rbody">&ldquo;' + esc(r.body) + '&rdquo;</p>' +
+      '<div class="ractions">' +
+        '<button class="btn-approve" onclick="approve(\'' + r.id + '\')">✓ Approve</button>' +
+        '<button class="btn-reject"  onclick="reject(\'' + r.id + '\')">✕ Reject</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function approve(id) {
+  fetch('/api/reviews/' + id + '/approve?adminKey=' + encodeURIComponent(adminKey), { method: 'PATCH' })
+    .then(function(r){ return r.json(); })
+    .then(function() {
+      allPending = allPending.filter(function(r){ return r.id !== id; });
+      buildTabs();
+      renderList();
+    });
+}
+
+function reject(id) {
+  if (!confirm('Delete this review permanently?')) return;
+  fetch('/api/reviews/' + id + '?adminKey=' + encodeURIComponent(adminKey), { method: 'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function() {
+      allPending = allPending.filter(function(r){ return r.id !== id; });
+      buildTabs();
+      renderList();
+    });
+}
+
+function loadAll() {
+  fetch('/api/reviews/pending?adminKey=' + encodeURIComponent(adminKey))
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      allPending = d.reviews || [];
+      buildTabs();
+      renderList();
+    });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('keyInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>
