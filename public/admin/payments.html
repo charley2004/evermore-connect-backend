@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payments Admin — Evermore Connect</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,system-ui,sans-serif;background:#04100A;color:#F0F7EF;min-height:100vh}
+  .login{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;padding:20px}
+  .login h1{font-size:20px;font-weight:700;color:#C9A84C}
+  .login input{width:280px;background:#0C1E10;border:1px solid rgba(201,168,76,.2);color:#F0F7EF;border-radius:8px;padding:11px 14px;font-size:14px;outline:none}
+  .login input:focus{border-color:#C9A84C}
+  .btn-gold{background:linear-gradient(135deg,#C9A84C,#b8952e);color:#000;border:none;padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;width:280px}
+  .err{color:#FF6B6B;font-size:13px}
+  .dash{display:none;padding:32px 24px;max-width:900px;margin:0 auto}
+  .dash.show{display:block}
+  .dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+  .dash-header h1{font-size:18px;font-weight:700;color:#C9A84C}
+  .nav-link{color:#A8C4A0;font-size:12px;text-decoration:none;margin-right:12px}
+  .nav-link:hover{color:#C9A84C}
+  .empty{color:#A8C4A0;font-size:13px;padding:16px 0}
+  .pcard{background:#0C1E10;border:1px solid rgba(201,168,76,.12);border-radius:12px;padding:18px;margin-bottom:14px}
+  .pcard-meta{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  .pname{font-size:13px;font-weight:700;color:#F0F7EF}
+  .pemail{font-size:11px;color:#A8C4A0}
+  .pref{font-size:10px;background:rgba(201,168,76,.1);color:#C9A84C;padding:2px 8px;border-radius:99px;font-weight:700}
+  .pdate{font-size:11px;color:#6A8A62;margin-left:auto}
+  .pamount{font-size:20px;font-weight:700;color:#C9A84C;margin-bottom:12px}
+  .pactions{display:flex;gap:8px}
+  .btn-approve{background:#5FAF7B;color:#000;border:none;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn-approve:hover{opacity:.85}
+  .btn-approve:disabled{opacity:.5;cursor:default}
+  .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#A8C4A0;margin-bottom:8px}
+  .loading{color:#A8C4A0;font-size:13px;padding:20px 0}
+</style>
+</head>
+<body>
+
+<div class="login" id="loginScreen">
+  <h1>Payments Admin</h1>
+  <input type="password" id="keyInput" placeholder="Enter admin key" autocomplete="off">
+  <button class="btn-gold" onclick="login()">Unlock</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div class="dash" id="dashboard">
+  <div class="dash-header">
+    <div>
+      <a class="nav-link" href="/admin/index.html">Reviews Admin</a>
+      <h1 style="margin-top:6px">Pending Activations</h1>
+    </div>
+    <button class="btn-gold" style="width:auto;padding:8px 18px;font-size:12px" onclick="loadAll()">↻ Refresh</button>
+  </div>
+
+  <div class="section-label">Awaiting Verification</div>
+  <div id="pendingList"><p class="loading">Loading…</p></div>
+</div>
+
+<script>
+var adminKey = '';
+var allPending = [];
+
+function login() {
+  var k = document.getElementById('keyInput').value.trim();
+  if (!k) return;
+  adminKey = k;
+
+  fetch('/api/admin/payments/pending?adminKey=' + encodeURIComponent(k))
+    .then(function(r) {
+      if (r.status === 403) throw new Error('Wrong admin key');
+      return r.json();
+    })
+    .then(function(d) {
+      allPending = d.payments || [];
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboard').classList.add('show');
+      renderList();
+    })
+    .catch(function(e) {
+      document.getElementById('loginErr').textContent = e.message;
+    });
+}
+
+function renderList() {
+  var el = document.getElementById('pendingList');
+
+  if (!allPending.length) {
+    el.innerHTML = '<p class="empty">No pending activations.</p>';
+    return;
+  }
+
+  el.innerHTML = allPending.map(function(p) {
+    var d = new Date(p.createdAt).toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' });
+    return '<div class="pcard" id="pc-' + p.id + '">' +
+      '<div class="pcard-meta">' +
+        '<span class="pname">' + esc(p.user.fullName) + '</span>' +
+        '<span class="pemail">' + esc(p.user.email) + '</span>' +
+        '<span class="pref">' + esc(p.user.referralCode) + '</span>' +
+        '<span class="pdate">' + d + '</span>' +
+      '</div>' +
+      '<div class="pamount">₦' + Number(p.amount).toLocaleString('en-NG') + '</div>' +
+      '<div class="pactions">' +
+        '<button class="btn-approve" onclick="verify(\'' + p.id + '\', this)">✓ Verify payment received</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function verify(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+  fetch('/api/admin/payments/' + id + '/verify?adminKey=' + encodeURIComponent(adminKey), { method: 'PATCH' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      allPending = allPending.filter(function(p){ return p.id !== id; });
+      renderList();
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = '✓ Verify payment received';
+    });
+}
+
+function loadAll() {
+  fetch('/api/admin/payments/pending?adminKey=' + encodeURIComponent(adminKey))
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      allPending = d.payments || [];
+      renderList();
+    });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('keyInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>

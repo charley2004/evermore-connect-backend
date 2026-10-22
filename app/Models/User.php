@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -23,6 +25,7 @@ class User extends Authenticatable
         'referral_code',
         'wallet_balance',
         'milestone_bonus_credited',
+        'is_admin',
     ];
 
     protected $hidden = [
@@ -37,12 +40,23 @@ class User extends Authenticatable
             'password' => 'hashed',
             'wallet_balance' => 'decimal:2',
             'milestone_bonus_credited' => 'boolean',
+            'is_admin' => 'boolean',
         ];
     }
 
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Only accounts explicitly flagged is_admin can reach the Filament
+     * panel — a regular customer signup can never land here, even if their
+     * session/credentials are compromised.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->is_admin === true;
     }
 
     /**

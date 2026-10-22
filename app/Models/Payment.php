@@ -31,4 +31,32 @@ class Payment extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    private const MILESTONE_BONUS = 10000;
+
+    /**
+     * Marks this payment verified, flips the linked user to verified, and
+     * credits the welcome milestone bonus exactly once. Shared by the admin
+     * API endpoint and the Filament payments resource so both stay in sync.
+     */
+    public function verifyAndCreditUser(): User
+    {
+        if ($this->status === 'success') {
+            throw new \RuntimeException('Payment already verified');
+        }
+
+        $this->update(['status' => 'success', 'verified_at' => now()]);
+
+        $user = $this->user;
+        $updates = ['status' => 'verified'];
+
+        if (! $user->milestone_bonus_credited) {
+            $updates['wallet_balance'] = $user->wallet_balance + self::MILESTONE_BONUS;
+            $updates['milestone_bonus_credited'] = true;
+        }
+
+        $user->update($updates);
+
+        return $user->fresh();
+    }
 }

@@ -8,8 +8,6 @@ use Illuminate\Http\JsonResponse;
 
 class AdminController extends Controller
 {
-    private const MILESTONE_BONUS = 10000;
-
     // GET /api/admin/payments/pending?adminKey=...
     public function pendingPayments(): JsonResponse
     {
@@ -43,22 +41,12 @@ class AdminController extends Controller
             return response()->json(['error' => 'Payment already verified'], 409);
         }
 
-        $payment->update(['status' => 'success', 'verified_at' => now()]);
-
-        $user = $payment->user;
-        $updates = ['status' => 'verified'];
-
-        if (! $user->milestone_bonus_credited) {
-            $updates['wallet_balance'] = $user->wallet_balance + self::MILESTONE_BONUS;
-            $updates['milestone_bonus_credited'] = true;
-        }
-
-        $user->update($updates);
+        $user = $payment->verifyAndCreditUser();
 
         return response()->json([
             'success' => true,
             'payment' => ['id' => (string) $payment->id, 'status' => $payment->status],
-            'user' => $user->fresh()->toPublicArray(),
+            'user' => $user->toPublicArray(),
         ]);
     }
 }
