@@ -17,9 +17,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Pure JSON API, no web login route — always respond with 401 JSON
-        // instead of Laravel's default redirect-to-"login"-route behavior.
+        // Only the /api/* JSON endpoints get a forced 401 JSON body instead
+        // of Laravel's default redirect-to-"login" behavior. Everything else
+        // (the Filament panel) needs the default handling so it can redirect
+        // to its own session-based login page.
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, \Illuminate\Http\Request $request) {
-            return response()->json(['error' => 'Invalid or expired session'], 401);
+            if ($request->is('api/*')) {
+                return response()->json(['error' => 'Invalid or expired session'], 401);
+            }
         });
     })->create();
