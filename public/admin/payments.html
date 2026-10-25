@@ -48,7 +48,7 @@
 <div class="dash" id="dashboard">
   <div class="dash-header">
     <div>
-      <a class="nav-link" href="/admin/index.html">Reviews Admin</a>
+      <a class="nav-link" href="index.html">Reviews Admin</a>
       <h1 style="margin-top:6px">Pending Activations</h1>
     </div>
     <button class="btn-gold" style="width:auto;padding:8px 18px;font-size:12px" onclick="loadAll()">↻ Refresh</button>
@@ -61,13 +61,17 @@
 <script>
 var adminKey = '';
 var allPending = [];
+// This page is deployed under a subdirectory in production (e.g. /evermore-api/admin/),
+// so a hardcoded "/api/..." path would resolve to the wrong place at the domain root.
+// Derive the API base from this page's own URL instead.
+var apiBase = location.pathname.replace(/\/admin\/?$/, '') + '/api';
 
 function login() {
   var k = document.getElementById('keyInput').value.trim();
   if (!k) return;
   adminKey = k;
 
-  fetch('/api/admin/payments/pending?adminKey=' + encodeURIComponent(k))
+  fetch(apiBase + '/admin/payments/pending?adminKey=' + encodeURIComponent(k))
     .then(function(r) {
       if (r.status === 403) throw new Error('Wrong admin key');
       return r.json();
@@ -111,7 +115,7 @@ function renderList() {
 function verify(id, btn) {
   btn.disabled = true;
   btn.textContent = 'Verifying…';
-  fetch('/api/admin/payments/' + id + '/verify?adminKey=' + encodeURIComponent(adminKey), { method: 'PATCH' })
+  fetch(apiBase + '/admin/payments/' + id + '/verify?adminKey=' + encodeURIComponent(adminKey), { method: 'PATCH' })
     .then(function(r) { return r.json(); })
     .then(function() {
       allPending = allPending.filter(function(p){ return p.id !== id; });
@@ -124,7 +128,7 @@ function verify(id, btn) {
 }
 
 function loadAll() {
-  fetch('/api/admin/payments/pending?adminKey=' + encodeURIComponent(adminKey))
+  fetch(apiBase + '/admin/payments/pending?adminKey=' + encodeURIComponent(adminKey))
     .then(function(r){ return r.json(); })
     .then(function(d) {
       allPending = d.payments || [];

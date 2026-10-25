@@ -70,13 +70,17 @@
 var adminKey = '';
 var allPending = [];
 var currentSite = 'all';
+// This page is deployed under a subdirectory in production (e.g. /evermore-api/admin/),
+// so a hardcoded "/api/..." path would resolve to the wrong place at the domain root.
+// Derive the API base from this page's own URL instead.
+var apiBase = location.pathname.replace(/\/admin\/?$/, '') + '/api';
 
 function login() {
   var k = document.getElementById('keyInput').value.trim();
   if (!k) return;
   adminKey = k;
 
-  fetch('/api/reviews/pending?adminKey=' + encodeURIComponent(k))
+  fetch(apiBase + '/reviews/pending?adminKey=' + encodeURIComponent(k))
     .then(function(r) {
       if (r.status === 403) throw new Error('Wrong admin key');
       return r.json();
@@ -151,7 +155,7 @@ function renderList() {
 }
 
 function approve(id) {
-  fetch('/api/reviews/' + id + '/approve?adminKey=' + encodeURIComponent(adminKey), { method: 'PATCH' })
+  fetch(apiBase + '/reviews/' + id + '/approve?adminKey=' + encodeURIComponent(adminKey), { method: 'PATCH' })
     .then(function(r){ return r.json(); })
     .then(function() {
       allPending = allPending.filter(function(r){ return r.id !== id; });
@@ -162,7 +166,7 @@ function approve(id) {
 
 function reject(id) {
   if (!confirm('Delete this review permanently?')) return;
-  fetch('/api/reviews/' + id + '?adminKey=' + encodeURIComponent(adminKey), { method: 'DELETE' })
+  fetch(apiBase + '/reviews/' + id + '?adminKey=' + encodeURIComponent(adminKey), { method: 'DELETE' })
     .then(function(r){ return r.json(); })
     .then(function() {
       allPending = allPending.filter(function(r){ return r.id !== id; });
@@ -172,7 +176,7 @@ function reject(id) {
 }
 
 function loadAll() {
-  fetch('/api/reviews/pending?adminKey=' + encodeURIComponent(adminKey))
+  fetch(apiBase + '/reviews/pending?adminKey=' + encodeURIComponent(adminKey))
     .then(function(r){ return r.json(); })
     .then(function(d) {
       allPending = d.reviews || [];
