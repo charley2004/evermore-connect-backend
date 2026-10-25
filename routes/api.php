@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ActivationController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
 // ── Auth ───────────────────────────────────────────────
@@ -15,6 +16,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Activation (real) ─────────────────────────────
     Route::post('/activation/submit', [ActivationController::class, 'submit']);
+
+    // ── Tasks — EverAI Training & Outsourced Job Board ─
+    Route::get('/tasks', [TaskController::class, 'index']);
+    Route::get('/tasks/history', [TaskController::class, 'history']);
+    Route::post('/tasks/{task}/submit', [TaskController::class, 'submit']);
 });
 
 // ── Reviews — same contract as the old Node backend ───

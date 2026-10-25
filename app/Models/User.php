@@ -50,6 +50,11 @@ class User extends Authenticatable implements FilamentUser, HasName
         return $this->hasMany(Payment::class);
     }
 
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
     /**
      * Only accounts explicitly flagged is_admin can reach the Filament
      * panel — a regular customer signup can never land here, even if their
